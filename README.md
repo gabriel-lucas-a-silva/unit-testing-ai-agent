@@ -29,7 +29,7 @@ Execute o plugin diretamente usando o comando completo:
 
 ```bash
 cd test-plugin-consumer
-mvn br.com.unicat:unicat-maven-plugin:1.0-SNAPSHOT:hello
+mvn br.com.unicat:unicat-maven-plugin:1.0-SNAPSHOT:unicat
 ```
 
 #### **Método Alternativo**

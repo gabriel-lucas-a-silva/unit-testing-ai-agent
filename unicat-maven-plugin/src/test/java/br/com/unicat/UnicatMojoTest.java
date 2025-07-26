@@ -1,4 +1,4 @@
-package br.com.unicat.tools;
+package br.com.unicat;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,10 +8,10 @@ import org.junit.jupiter.api.AfterAll;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Testes unitários para CodeWriterTool
+ * Testes unitários para UnicatMojo
  * Gerados automaticamente pelo UniCat Maven Plugin
  */
-public class CodeWriterToolTest {
+public class UnicatMojoTest {
 
     @BeforeAll
     static void setUpClass() {
@@ -25,14 +25,14 @@ public class CodeWriterToolTest {
 
     @Test
     void testBasicFunctionality() {
-        // TODO: Implementar teste básico para CodeWriterTool
+        // TODO: Implementar teste básico para UnicatMojo
         assertTrue(true, "Teste básico - implementar lógica específica");
     }
 
     @Test
     void testConstructor() {
-        // TODO: Testar construtor da classe CodeWriterTool
-        // Exemplo: CodeWriterTool instance = new CodeWriterTool();
+        // TODO: Testar construtor da classe UnicatMojo
+        // Exemplo: UnicatMojo instance = new UnicatMojo();
         // assertNotNull(instance);
         assertTrue(true, "Teste de construtor - implementar lógica específica");
     }

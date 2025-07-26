@@ -27,6 +27,18 @@
       <version>3.6.0</version>
       <scope>provided</scope>
     </dependency>
+    <!-- Maven Invoker API para evitar deadlock ao executar Maven de dentro de um plugin -->
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-invoker</artifactId>
+      <version>3.2.0</version>
+    </dependency>
+    <!-- Apache Commons IO para operações de arquivo no workspace isolado -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.11.0</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

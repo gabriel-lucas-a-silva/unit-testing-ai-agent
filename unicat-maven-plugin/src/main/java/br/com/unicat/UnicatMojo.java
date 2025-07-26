@@ -7,7 +7,6 @@ import org.apache.maven.plugins.annotations.Parameter;
 import br.com.unicat.tools.CodeWriterTool;
 import br.com.unicat.tools.BuildAndTestTool;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,7 +42,16 @@ public class UnicatMojo extends AbstractMojo {
     @Parameter(property = "buildTimeout", defaultValue = "300")
     private int buildTimeout;
     
+    @Parameter(property = "unicat.skip", defaultValue = "false")
+    private boolean skip;
+    
     public void execute() throws MojoExecutionException {
+        // Verifica se deve pular a execução do plugin
+        if (skip) {
+            getLog().info("⏭️ UniCat - Execução pulada (unicat.skip=true)");
+            return;
+        }
+        
         getLog().info("🚀 UniCat - Iniciando geração automática de testes unitários...");
         
         CodeWriterTool codeWriter = new CodeWriterTool();
@@ -249,51 +257,122 @@ public class UnicatMojo extends AbstractMojo {
     }
     
     /**
-     * Executa build e testes do projeto após a geração dos testes.
+     * Executa build e testes do projeto em workspace isolado após a geração dos testes.
      */
     private void executeBuildAndTests(BuildAndTestTool buildTool) {
-        getLog().info("🔨 Iniciando build e testes do projeto...");
+        getLog().info("🔨 Iniciando build e testes em workspace isolado...");
         
         String projectPath = System.getProperty("user.dir");
+        BuildAndTestTool.WorkspaceInfo workspaceInfo = null;
         
         try {
-            // Executa build se configurado
-            if (runBuildAfterGeneration) {
-                getLog().info("📦 Executando build do projeto...");
-                BuildAndTestTool.CommandResult buildResult = buildTool.executeMavenCommand(projectPath, "compile", buildTimeout);
+            // 1. Criar workspace isolado
+            getLog().info("🏗️ Criando workspace isolado...");
+            workspaceInfo = buildTool.createIsolatedWorkspace(projectPath);
+            
+            if (!workspaceInfo.success) {
+                getLog().error("❌ Falha ao criar workspace isolado: " + workspaceInfo.errorMessage);
+                return;
+            }
+            
+            getLog().info("✅ Workspace isolado criado: " + workspaceInfo.workspacePath);
+            
+            // 2. Gerar testes no workspace (se necessário)
+            // Nota: Os testes já foram gerados no projeto original, mas precisamos copiá-los para o workspace
+            getLog().info("📋 Copiando testes gerados para workspace...");
+            
+            // 3. Validar build e testes no workspace
+            if (runBuildAfterGeneration || runTestsAfterGeneration) {
+                getLog().info("🔍 Validando build e testes no workspace...");
+                BuildAndTestTool.ValidationResult validationResult = buildTool.validateBuildAndTests(workspaceInfo.workspacePath);
                 
-                if (buildResult.success) {
-                    getLog().info("✅ Build executado com sucesso!");
-                } else {
-                    getLog().warn("⚠️ Build falhou com código: " + buildResult.exitCode);
-                    if (buildResult.errorOutput != null && !buildResult.errorOutput.isEmpty()) {
-                        getLog().warn("📋 Erros do build:");
-                        getLog().warn(buildResult.errorOutput);
+                getLog().info("📊 Resultado da validação: " + validationResult.summary);
+                
+                if (validationResult.overallSuccess) {
+                    getLog().info("✅ Validação completa bem-sucedida!");
+                    
+                    // 4. Copiar testes validados para projeto original
+                    getLog().info("📋 Copiando testes validados para projeto original...");
+                    BuildAndTestTool.CopyResult copyResult = buildTool.copyTestsToOriginalProject(
+                        workspaceInfo.workspacePath, 
+                        workspaceInfo.originalProjectPath
+                    );
+                    
+                    if (copyResult.success) {
+                        getLog().info("✅ " + copyResult.filesCopied + " arquivos de teste entregues com sucesso!");
+                        getLog().info("📄 Arquivos copiados:");
+                        for (String file : copyResult.copiedFiles) {
+                            getLog().info("   - " + file);
+                        }
+                    } else {
+                        getLog().error("❌ Erro ao copiar testes: " + copyResult.errorMessage);
                     }
+                    
+                    // Log detalhado dos resultados
+                    if (validationResult.buildResult != null) {
+                        logCommandResult("Build", validationResult.buildResult);
+                    }
+                    if (validationResult.testResult != null) {
+                        logCommandResult("Testes", validationResult.testResult);
+                    }
+                    
+                } else {
+                    getLog().error("❌ Validação falhou - testes não serão entregues!");
+                    
+                    // Log detalhado dos erros
+                    if (validationResult.buildResult != null && !validationResult.buildSuccess) {
+                        logCommandResult("Build (FALHOU)", validationResult.buildResult);
+                    }
+                    if (validationResult.testResult != null && !validationResult.testsSuccess) {
+                        logCommandResult("Testes (FALHARAM)", validationResult.testResult);
+                    }
+                    
+                    getLog().error("🚫 Testes gerados NÃO foram entregues devido a falhas na validação!");
+                }
+            } else {
+                getLog().info("⏭️ Build e testes desabilitados - copiando testes sem validação...");
+                
+                // Copiar testes sem validação (modo não-seguro)
+                BuildAndTestTool.CopyResult copyResult = buildTool.copyTestsToOriginalProject(
+                    workspaceInfo.workspacePath, 
+                    workspaceInfo.originalProjectPath
+                );
+                
+                if (copyResult.success) {
+                    getLog().info("✅ " + copyResult.filesCopied + " arquivos de teste copiados (sem validação)");
+                } else {
+                    getLog().error("❌ Erro ao copiar testes: " + copyResult.errorMessage);
                 }
             }
             
-            // Executa testes se configurado
-            if (runTestsAfterGeneration) {
-                getLog().info("🧪 Executando testes do projeto...");
-                BuildAndTestTool.CommandResult testResult = buildTool.executeMavenCommand(projectPath, "test", buildTimeout);
-                
-                if (testResult.success) {
-                    getLog().info("✅ Testes executados com sucesso!");
-                    if (testResult.output != null && !testResult.output.isEmpty()) {
-                        // Extrai informações relevantes da saída dos testes
-                        extractTestSummary(testResult.output);
-                    }
-                } else {
-                    getLog().warn("⚠️ Testes falharam com código: " + testResult.exitCode);
-                    if (testResult.errorOutput != null && !testResult.errorOutput.isEmpty()) {
-                        getLog().warn("📋 Erros dos testes:");
-                        getLog().warn(testResult.errorOutput);
-                    }
-                }
-            }
         } catch (Exception e) {
-            getLog().warn("⚠️ Erro ao executar build e testes: " + e.getMessage());
+            getLog().error("❌ Erro durante execução em workspace isolado: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            // 5. Limpar workspace
+            if (workspaceInfo != null && workspaceInfo.workspacePath != null) {
+                getLog().info("🧹 Limpando workspace isolado...");
+                buildTool.cleanupWorkspace(workspaceInfo.workspacePath);
+            }
+        }
+    }
+    
+    /**
+     * Loga detalhes de um resultado de comando.
+     */
+    private void logCommandResult(String operation, BuildAndTestTool.CommandResult result) {
+        getLog().info("📋 " + operation + " - Código: " + result.exitCode + 
+                     ", Sucesso: " + result.success + 
+                     ", Tempo: " + result.executionTimeMs + "ms");
+        
+        if (result.output != null && !result.output.isEmpty()) {
+            getLog().info("📋 Logs de " + operation + ":");
+            getLog().info(result.output);
+        }
+        
+        if (result.errorOutput != null && !result.errorOutput.isEmpty()) {
+            getLog().warn("📋 Erros de " + operation + ":");
+            getLog().warn(result.errorOutput);
         }
     }
     

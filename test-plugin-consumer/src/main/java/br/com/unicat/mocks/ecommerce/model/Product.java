@@ -22,4 +22,9 @@ public class Product {
 	public int getStock() { return stock; }
 	public void setStock(int stock) { this.stock = stock; }
 	public double getWeight() { return weight; }
+	
+	// Método válido (erro corrigido)
+	public String getInvalidMethod() {
+		return "Hello"; // Corrigido
+	}
 }

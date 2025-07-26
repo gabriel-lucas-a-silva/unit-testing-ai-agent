@@ -121,4 +121,29 @@
       </plugin>
     </plugins>
   </build>
+  
+  <profiles>
+    <profile>
+      <id>invoker-skip-unicat</id>
+      <activation>
+        <property>
+          <name>skipUnicatProfile</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>br.com.unicat</groupId>
+            <artifactId>unicat-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>default-cli</id>
+                <phase>none</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
