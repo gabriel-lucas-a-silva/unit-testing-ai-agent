@@ -5,6 +5,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import br.com.unicat.tools.CodeWriterTool;
+import br.com.unicat.tools.BuildAndTestTool;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -33,10 +34,20 @@ public class UnicatMojo extends AbstractMojo {
     @Parameter(property = "generateForAllClasses", defaultValue = "true")
     private boolean generateForAllClasses;
     
+    @Parameter(property = "runBuildAfterGeneration", defaultValue = "true")
+    private boolean runBuildAfterGeneration;
+    
+    @Parameter(property = "runTestsAfterGeneration", defaultValue = "true")
+    private boolean runTestsAfterGeneration;
+    
+    @Parameter(property = "buildTimeout", defaultValue = "300")
+    private int buildTimeout;
+    
     public void execute() throws MojoExecutionException {
         getLog().info("🚀 UniCat - Iniciando geração automática de testes unitários...");
         
         CodeWriterTool codeWriter = new CodeWriterTool();
+        BuildAndTestTool buildTool = new BuildAndTestTool();
         
         try {
             // Verifica se o diretório fonte existe
@@ -79,10 +90,15 @@ public class UnicatMojo extends AbstractMojo {
             }
             
             getLog().info("✅ Geração concluída!");
-            getLog().info("📊 Resumo:");
+            getLog().info("📊 Resumo da Geração:");
             getLog().info("   - Testes gerados: " + generatedTests);
             getLog().info("   - Testes pulados: " + skippedTests);
             getLog().info("   - Total processado: " + javaFiles.size());
+            
+            // Executa build e testes se configurado
+            if (runBuildAfterGeneration || runTestsAfterGeneration) {
+                executeBuildAndTests(buildTool);
+            }
             
         } catch (Exception e) {
             throw new MojoExecutionException("Erro durante a geração de testes: " + e.getMessage(), e);
@@ -126,10 +142,10 @@ public class UnicatMojo extends AbstractMojo {
         // Cria o caminho do arquivo de teste
         String testFilePath = testDir + "/" + packageName.replace(".", "/") + "/" + testClassName + ".java";
         
-        // Verifica se o teste já existe
+        // Verifica se o teste já existe (temporariamente desabilitado para demonstração)
         if (codeWriter.fileExists(testFilePath)) {
-            getLog().debug("⏭️ Teste já existe: " + testClassName);
-            return false;
+            getLog().debug("⏭️ Teste já existe: " + testClassName + " - sobrescrevendo para demonstração");
+            // return false; // Comentado temporariamente
         }
         
         // Gera o conteúdo do teste
@@ -230,5 +246,83 @@ public class UnicatMojo extends AbstractMojo {
         content.append("}\n");
         
         return content.toString();
+    }
+    
+    /**
+     * Executa build e testes do projeto após a geração dos testes.
+     */
+    private void executeBuildAndTests(BuildAndTestTool buildTool) {
+        getLog().info("🔨 Iniciando build e testes do projeto...");
+        
+        String projectPath = System.getProperty("user.dir");
+        
+        try {
+            // Executa build se configurado
+            if (runBuildAfterGeneration) {
+                getLog().info("📦 Executando build do projeto...");
+                BuildAndTestTool.CommandResult buildResult = buildTool.executeMavenCommand(projectPath, "compile", buildTimeout);
+                
+                if (buildResult.success) {
+                    getLog().info("✅ Build executado com sucesso!");
+                } else {
+                    getLog().warn("⚠️ Build falhou com código: " + buildResult.exitCode);
+                    if (buildResult.errorOutput != null && !buildResult.errorOutput.isEmpty()) {
+                        getLog().warn("📋 Erros do build:");
+                        getLog().warn(buildResult.errorOutput);
+                    }
+                }
+            }
+            
+            // Executa testes se configurado
+            if (runTestsAfterGeneration) {
+                getLog().info("🧪 Executando testes do projeto...");
+                BuildAndTestTool.CommandResult testResult = buildTool.executeMavenCommand(projectPath, "test", buildTimeout);
+                
+                if (testResult.success) {
+                    getLog().info("✅ Testes executados com sucesso!");
+                    if (testResult.output != null && !testResult.output.isEmpty()) {
+                        // Extrai informações relevantes da saída dos testes
+                        extractTestSummary(testResult.output);
+                    }
+                } else {
+                    getLog().warn("⚠️ Testes falharam com código: " + testResult.exitCode);
+                    if (testResult.errorOutput != null && !testResult.errorOutput.isEmpty()) {
+                        getLog().warn("📋 Erros dos testes:");
+                        getLog().warn(testResult.errorOutput);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            getLog().warn("⚠️ Erro ao executar build e testes: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Extrai e exibe um resumo dos resultados dos testes.
+     */
+    private void extractTestSummary(String testOutput) {
+        getLog().info("📊 Resumo dos Testes:");
+        
+        // Procura por padrões comuns na saída do Maven Surefire
+        String[] lines = testOutput.split("\n");
+        for (String line : lines) {
+            line = line.trim();
+            
+            // Padrões de sucesso
+            if (line.contains("Tests run:") && line.contains("Failures: 0") && line.contains("Errors: 0")) {
+                getLog().info("   ✅ " + line);
+            }
+            // Padrões de falha
+            else if (line.contains("Tests run:") && (line.contains("Failures:") || line.contains("Errors:"))) {
+                getLog().warn("   ❌ " + line);
+            }
+            // Informações de cobertura (se disponível)
+            else if (line.contains("BUILD SUCCESS")) {
+                getLog().info("   🎉 " + line);
+            }
+            else if (line.contains("BUILD FAILURE")) {
+                getLog().warn("   💥 " + line);
+            }
+        }
     }
 }

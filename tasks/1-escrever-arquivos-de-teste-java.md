@@ -155,3 +155,30 @@ public boolean appendCodeToFile(String filePath, String content) {
 - Nenhuma `IOException` não tratada é propagada para fora da `CodeWriterTool`.
 - Mensagens de erro claras são logadas quando uma operação de I/O falha.
 - Os métodos de escrita/append retornam um status que indica o sucesso ou falha da operação.
+
+## 4. Integração com Google ADK (Conceitual)
+
+Para integrar a `CodeWriterTool` com o Google ADK, ela precisará ser registrada como uma Tool que o agente pode invocar. O Google ADK permitirá que o LLM ou o `TestPlanner` chame os métodos `writeCodeFile` ou `appendCodeToFile` com o caminho e o conteúdo do arquivo, e receba o status de sucesso/falha como resultado.
+
+**Exemplo de Registro (Conceitual - a ser detalhado na fase de Integração):
+
+```java
+
+```
+
+## 5. Testes Unitários (para `CodeWriterTool`)
+
+Testes unitários devem ser escritos para a classe `CodeWriterTool` para garantir que cada sub-tarefa funcione conforme o esperado. Casos de teste devem incluir:
+
+- Criação de um novo arquivo em um diretório existente.
+- Criação de um novo arquivo em um diretório inexistente (verificar criação de diretórios).
+- Sobrescrita de um arquivo existente.
+- Adição de conteúdo a um arquivo existente.
+- Tentativa de adicionar conteúdo a um arquivo inexistente (verificar comportamento esperado).
+- Testes de exceção (simular permissão negada, por exemplo, se possível).
+- Verificação do conteúdo do arquivo após as operações de escrita/append.
+
+## 6. Referências
+
+- **Java NIO.2 (Files API):**
+  <https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html>
